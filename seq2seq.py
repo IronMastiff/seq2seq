@@ -7,12 +7,12 @@ import preprocessor
 import utils
 import test
 
-'''--------Mode--------'''
+'''--------Mode Cell--------'''
 # Hyperparameters
 # Number of Epochs
 epochs = 60
 # Batch_Size
-Batch_size = 128
+batch_size = 128
 # RNN Size
 rnn_size = 50
 # Number of Layers
@@ -66,7 +66,7 @@ def process_decoder_input( target_data, vocab_to_int, batch_size ):
     return dec_input
 
 
-def decoding_layer( target_latter_to_int, decoding_embedding_size, num_lyaers, rnn_size, target_seqence_length,
+def decoding_layer( target_letter_to_int, decoding_embedding_size, num_lyaers, rnn_size, target_seqence_length,
                     max_target_sequence_length, enc_state, dec_input ):
     # 1.Decoder Embedding
     target_vocab_size = len( target_letter_to_int )
@@ -83,4 +83,47 @@ def decoding_layer( target_latter_to_int, decoding_embedding_size, num_lyaers, r
 
     # 3. Dense layer to translate the docoder's output at each time
     # Step into a choise from the target vocabulary
-    output_layer = tf.layers.Dense( target_vocab_size, kernel_initializer = tf.truncated_normal_initializer( mean = 0.0, stddev = 0.1 ) )
+    ouput_layer = tf.layers.Dense( target_vocab_size, kernel_initializer = tf.truncated_normal_initializer( mean = 0.0, stddev = 0.1 ) )
+
+    # 4. Set up a training decoder and an inference decoder
+    # Training Decoder
+    with tf.variable_scope( 'decode' ):
+
+        # Helper for the training process. Used by BaisicDecoder to read inputs.
+        training_helper = tf_contrib.seq2seq.TrainingHelper( inputs = dec_embed_input,
+                                                          seqence_length = target_seqence_lenght,
+                                                          time_majr = False )
+
+        # Basic decoder
+        training_decoder = tf_contrib.seq2seq.BasicDecoder( dec_cell,
+                                                            training_helper,
+                                                            enc_state,
+                                                            output_layer )
+
+        # Perform dynamic decoding using the decoder
+        training_decoder_output = tf_contrib.seq2seq.dynamic_decode( training_decoder,
+                                                                  impute_finished = True,
+                                                                  maximun_iterations = max_target_sequence_length )[0]
+
+    # 5. Inference Decoder
+    # Resuse the same parameter trained by the training process
+    with tf.variable_scope( 'decode', reuse = True ):
+        start_tokens = tf.tile( tf.constant( [target_letter_to_int['<GO>']], dtype = tf.int32 ), [batch_size], name = 'start_token' )
+
+        # Helper for the inferece process
+        inference_helper = tf_contrib.seq2seq.GreedyEmbeddingHelper( dec_embeddings,
+                                                                     start_tokens,
+                                                                     target_letter_to_int['<EOS>'] )
+
+        # Basic decoder
+        inference_helper = tf_contrib.seq2seq.BasicDecoder( dec_cell,
+                                                            inference_helper,
+                                                            enc_state,
+                                                            output_layer )
+
+        # Perform dynamic decoding using the decoder
+        inference_decoder_output = tf_contrib.seq2seq.dynamic_decode( inference_decoder_output,
+                                                                      impute_finished  = True,
+                                                                      maximun_iterations = max_target_sequence_length )
+
+    return training_decoder_output, inference_decoder_output
