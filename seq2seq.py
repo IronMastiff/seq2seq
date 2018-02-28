@@ -7,7 +7,7 @@ import preprocessor
 import utils
 import test
 
-'''--------Mode Cell--------'''
+'''--------The Mode Cell--------'''
 # Hyperparameters
 # Number of Epochs
 epochs = 60
@@ -125,5 +125,34 @@ def decoding_layer( target_letter_to_int, decoding_embedding_size, num_lyaers, r
         inference_decoder_output = tf_contrib.seq2seq.dynamic_decode( inference_decoder_output,
                                                                       impute_finished  = True,
                                                                       maximun_iterations = max_target_sequence_length )
+
+    return training_decoder_output, inference_decoder_output
+
+
+'''--------Model--------'''
+def seq2seq_model( input_data, targets, Lr, target_sequence_length, max_target_sequence_length,
+                   source_sequence_length, source_vocab_size, target_vocab_size, dec_embedding_size,
+                   enc_embedding_size, rnn_size, num_layers):
+
+    # Pass the input data through the encoder. We'll ignore the encoder output, but use the state
+    _, enc_state = encoding_layer( input_data,
+                                   rnn_size,
+                                   num_layers,
+                                   source_sequence_length,
+                                   source_vocab_size,
+                                   encoding_embedding_size )
+
+    # Prepare the target sequences we'll feed to the decoder in training made
+    dec_input = process_decoder_input( targets, target_letter_to_int, batch_size )
+
+    # Pass encoder state and decoder inputs to teh decoders
+    training_decoder_output, inference_decoder_output = decoding_layer( target_letter_to_int,
+                                                                        decoding_ebedding_size,
+                                                                        num_lyaers,
+                                                                        rnn_size,
+                                                                        target_sequence_length,
+                                                                        max_target_sequence_length,
+                                                                        enc_state,
+                                                                        dec_input )
 
     return training_decoder_output, inference_decoder_output
