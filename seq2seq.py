@@ -143,7 +143,7 @@ def seq2seq_model( input_data, targets, Lr, target_sequence_length, max_target_s
                                    encoding_embedding_size )
 
     # Prepare the target sequences we'll feed to the decoder in training made
-    dec_input = process_decoder_input( targets, target_letter_to_int, batch_size )
+    dec_input = process_decoder_input( targets, preprocessor.target_letter_to_int, batch_size )
 
     # Pass encoder state and decoder inputs to teh decoders
     training_decoder_output, inference_decoder_output = decoding_layer( target_letter_to_int,
@@ -164,6 +164,9 @@ train_graph = tf.Graph()
 with train_graph.as_default():
 
     # Load the madel inputs
+    input_data, targets, Lr, target_sequence_length, max_target_sequence_length, source_sequence_length = get_model_inputs()
+
+    # Create the training and inference logits
     training_decoder_output, inference_decoder_output = seq2seq_model( input_data,
                                                                        targets,
                                                                        Lr,
@@ -179,3 +182,50 @@ with train_graph.as_default():
 
     # Create tensors for the training logits and inference logits
     training_logits = tf.identity( training_decoder_output.rnn_output, name = 'logits' )
+    inference_logits = tf.identity( inference_decoder_output.sample_id, name = 'predictions' )
+
+    # Create the weights for sequence_loss
+    masks = tf.sequence_mask( target_sequence_length, max_target_sequence_length, dtype = tf.float32, name = 'masks' )    # tf.sequence_maks( lengths, maxlen=None, dtype=dtypes.bool, name=None )
+
+    with tf.name_scope( 'optimization' ):
+
+        # Loss function
+        cost = tf_contrib.seq2seq.sequence_loss( training_logits,
+                                                 targets,
+                                                 masks )
+
+        # Optimizer
+        optimizer = tf.train.AdamOptimizer( Lr )
+
+        # Gradient Clipping
+        gradients = optimizer.compute_gradients( cost )
+        capped_gradients = [( tf.clip_by_value( grad, -5, 5 ), var ) for grad, var in gradients if grad is not None]
+        train_op = optimizer.apply_gradients( capped_gradients )
+
+
+'''--------Get Batch--------'''
+def pad_sentence_batch( sentence_batch, pad_int ):
+    """Pad sentences with <PAD> so that each sentences of a batch has the same length"""
+    max_sentence = max( [len( sentence ) for sentence in sentence_batch] )
+    return [sentence + [pad_int] * ( max_sentence - len( sentence ) ) for sentence in sentence_batch]
+
+
+def get_batches( targets, sources, batch_size, source_pad_int, target_pad_int ):
+    """Batch targets, sources, and the lengths of their sentences together"""
+    for batch_i in range( 0, len( sources ) // batch_size ):
+        start_i = batch_i * batch_size
+        sources_batch = sources[start_i : start_i + batch_size]
+        targets_batch = targets[start_i : start_i * batch_size]
+        pad_sources_batch = np.array( pad_sentence_batch( sources_batch, source_pad_int ) )
+        pad_targets_batch = np.array( pad_sentence_batch( targets_batch, target_pad_int ) )
+
+        # Need the lengths for the _lengths parameters
+        pad_targets_lengths = []
+        for target in pad_targets_batch:
+            pad_targets_lengths.append( len( target ) )
+
+        pad_source_lengths = []
+        for source in pad_sources_batch:
+            pad_source_lengths.append( len( source ) )
+
+        yield pad_targets_batch, pad_souces_batch, pad_targets_lengths, pad_source_lengths
