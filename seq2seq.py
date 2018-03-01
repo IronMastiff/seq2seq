@@ -83,7 +83,7 @@ def decoding_layer( target_letter_to_int, decoding_embedding_size, num_lyaers, r
 
     # 3. Dense layer to translate the docoder's output at each time
     # Step into a choise from the target vocabulary
-    ouput_layer = tf.layers.Dense( target_vocab_size, kernel_initializer = tf.truncated_normal_initializer( mean = 0.0, stddev = 0.1 ) )
+    output_layer = tf.layers.Dense( target_vocab_size, kernel_initializer = tf.truncated_normal_initializer( mean = 0.0, stddev = 0.1 ) )
 
     # 4. Set up a training decoder and an inference decoder
     # Training Decoder
@@ -156,3 +156,26 @@ def seq2seq_model( input_data, targets, Lr, target_sequence_length, max_target_s
                                                                         dec_input )
 
     return training_decoder_output, inference_decoder_output
+
+
+# Build the graph
+train_graph = tf.Graph()
+# Set the graph to default to ensure that it is ready for training
+with train_graph.as_default():
+
+    # Load the madel inputs
+    training_decoder_output, inference_decoder_output = seq2seq_model( input_data,
+                                                                       targets,
+                                                                       Lr,
+                                                                       target_sequence_length,
+                                                                       max_target_sequence_length,
+                                                                       source_sequence_length,
+                                                                       len( preprocessor.source_letter_to_int ),
+                                                                       len( preprocessor.target_letter_to_int ),
+                                                                       encoding_embedding_size,
+                                                                       decoding_embedding_size,
+                                                                       rnn_size,
+                                                                       num_layers )
+
+    # Create tensors for the training logits and inference logits
+    training_logits = tf.identity( training_decoder_output.rnn_output, name = 'logits' )
