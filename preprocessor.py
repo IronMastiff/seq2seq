@@ -28,7 +28,7 @@ def extract_character_vocab( data ):
 
 '''--------Build int2letter and letter2int dictis--------'''
 source_int_to_letter, source_letter_to_int = extract_character_vocab( source_sentences )
-target_int_to_letter, target_letter_to_int= extract_character_vocab( target_sentences )
+target_int_to_letter, target_letter_to_int = extract_character_vocab( target_sentences )
 
 
 '''--------Convert character to ids--------'''
