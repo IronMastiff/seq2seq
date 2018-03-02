@@ -300,3 +300,39 @@ def source_to_seq( text ):
     sequence_length = 7
     return [preprocessor.source_letter_to_int.get( word, preprocessor.source_letter_to_int['<UNK>']) for word in text] + \
             [preprocessor.source_letter_to_int['<PAD>']] * ( sequence_length - len( text ) )
+
+
+input_sentence = 'hello'
+text = source_to_seq( input_sentence )
+
+checkpoint = './best_model.ckpt'
+
+loaded_graph = tf.Graph()
+with tf.Session( graph = loaded_graph ) as sess:
+    # Load saved model
+    loader = tf.train.import_meta_graph( checkpoint + '.meta' )
+    loader.restore( sess, checkpoint )
+
+    input_data = loaded_graph.get_tensor_by_name( 'input:0' )
+    logits = loaded_graph.get_tensor_by_name( 'predictions:0' )
+    source_sequence_length = loaded_graph.get_tensor_by_name( 'source_sequence_length:0' )
+    target_sequence_length = laoded_graph.get_tensor_by_name( 'target_sequence_length:0' )
+
+    # Multiply by batch_size to match the model's input parameters
+    answer_logits = sess.run( logits, {
+        input_data : [text] * batch_size,
+        target_sequence_length : [len( text )] * batch_size,
+        source_sequence_length : [len( text )] * batch_size
+    })[0]
+
+pad = source_letter_to_int['<PAD>']
+
+print( 'Original Text:', input_sentene )
+
+print( '\nSource' )
+print( '  Word Ids:     {}'.format( [i for i in text] ) )
+print( '  Input Words:  {}'.format( " ".join( [source_int_to_letter[i] for i in text] ) ) )
+
+print( '\nTarghet' )
+print( '  Word Ids:       {}'.format( [i for i in answer_logits if i != pad] ) )
+print( '  Response Words: {}'.format( " ".join( [target_int_to_letter[i] for i in answer_logits if i != pad] ) ) )
