@@ -228,4 +228,38 @@ def get_batches( targets, sources, batch_size, source_pad_int, target_pad_int ):
         for source in pad_sources_batch:
             pad_source_lengths.append( len( source ) )
 
-        yield pad_targets_batch, pad_souces_batch, pad_targets_lengths, pad_source_lengths
+        yield pad_targets_batch, pad_sources_batch, pad_targets_lengths, pad_source_lengths
+
+'''--------Train--------'''
+# Split data to training and validation sets
+train_source = preprocessor.source_letter_ids[batch_size :]
+train_target = preprocessor.target_letter_ids[batch_size :]
+valid_source = preprocessor.source_letter_ids[: batch_size]
+valid_target = preprocessor.target_letter_ids[: batch_size]
+( valid_targets_batch, valid_source_batch, valid_targets_lengths, valid_sources_lengths ) = next( get_batches( valid_targt,
+                                                                                                               valid_source,
+                                                                                                               batch_size,
+                                                                                                               preprocessor.source_letter_to_int['<PAD>'],
+                                                                                                               preprocessor.target_letter_to_int['<PAD>']
+                                                                                                                ) )
+
+display_step = 20    # Check training loss after every 20 batches
+
+checkpoint = "best_model.ckpt"
+with tf.Session( graph = train_graph ) as sess:
+    sess.run( tf.global_variables_initializer() )
+
+    for epoch_i in range( 1, epoch + 1 ):
+        for batch_i, ( targets_batch, sources_batch, targets_lengths, sources_lengths ) in enumerate(
+                get_batches( train_target, train_source, batch_size,
+                             preprocessor.source_letter_to_int['<PAD>'],
+                             preprocessor.target_letter_to_int['<PAD>'] ) ):
+
+            # Training step
+            _, loss = sess.run( [train_op, cost], {
+                input_data : sources_batch,
+                targets : targets_batch,
+                Lr : learning_rate,
+                target_sequence_length : targets_lengths,
+                source_sequence_length : sources_lengths
+            })
