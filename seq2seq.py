@@ -236,7 +236,7 @@ train_source = preprocessor.source_letter_ids[batch_size :]
 train_target = preprocessor.target_letter_ids[batch_size :]
 valid_source = preprocessor.source_letter_ids[: batch_size]
 valid_target = preprocessor.target_letter_ids[: batch_size]
-( valid_targets_batch, valid_source_batch, valid_targets_lengths, valid_sources_lengths ) = next( get_batches( valid_targt,
+( valid_targets_batch, valid_sources_batch, valid_targets_lengths, valid_sources_lengths ) = next( get_batches( valid_targt,
                                                                                                                valid_source,
                                                                                                                batch_size,
                                                                                                                preprocessor.source_letter_to_int['<PAD>'],
@@ -263,3 +263,40 @@ with tf.Session( graph = train_graph ) as sess:
                 target_sequence_length : targets_lengths,
                 source_sequence_length : sources_lengths
             })
+
+            # Debug message updating us on the status of the training
+            if batch_i & display_step == 0 and batch_i > 0:
+
+                # Calculate validation cost
+                validation_loss = sess.run(
+                    [cost],
+                    {
+                        input_data : valid_sources_batch,
+                        targets : targets_batch,
+                        Lr : learning_rate,
+                        target_sequence_length : targets_lengths,
+                        source_sequence_length : sources_lengths
+                    }
+                )
+
+                print( 'Epoch { : > 3 } / {} Batch { : > 4 } / {} - Loss : { : 6.3f } - Validation loss : { : > 6.3f }'
+                       .format( epoch_i,
+                                epochs,
+                                batch_i,
+                                len( train_source // batch_size),
+                                loss,
+                                validation_loss[0]))
+
+
+    # Save Model
+    saver = tf.train.Saver()
+    saver.save( sess, checkpoint )
+    print( 'Model Trained and Saved' )
+
+
+'''--------Prediction--------'''
+def source_to_seq( text ):
+    '''Prepare the text for the model'''
+    sequence_length = 7
+    return [preprocessor.source_letter_to_int.get( word, preprocessor.source_letter_to_int['<UNK>']) for word in text] + \
+            [preprocessor.source_letter_to_int['<PAD>']] * ( sequence_length - len( text ) )
