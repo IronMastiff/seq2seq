@@ -30,7 +30,7 @@ def source_to_seq( text ):
             [preprocessor.source_letter_to_int['<PAD>']] * ( sequence_length - len( text ) )
 
 
-input_sentence = 'hello'
+input_sentence = 'zab'
 text = source_to_seq( input_sentence )
 
 checkpoint = './best_model.ckpt'
