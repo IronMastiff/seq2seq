@@ -31,7 +31,7 @@ def get_model_inputs():
     Lr = tf.placeholder( tf.float32, name = 'learning_rate' )
 
     target_sequence_length = tf.placeholder( tf.int32, ( None, ), name = 'target_sequence_length' )
-    max_target_sequence_lenght = tf.reduce_max( target_sequence_length, name = "max_target_len" )
+    max_target_sequence_length = tf.reduce_max( target_sequence_length, name = "max_target_len" )
     source_sequence_length = tf.placeholder( tf.int32, ( None, ), name = 'source_sequence_length' )
 
     return input_data, targets, Lr, target_sequence_length, max_target_sequence_length, source_sequence_length
@@ -46,7 +46,7 @@ def encoding_layer( input_data, rnn_size, num_layers, source_sequence_length, so
 
     # RNN cell
     def make_cell( rnn_size ):
-        enc_cell = tf_contrib.rnn.LSTMCell( rnn.size, initializer = tf.random_uniform_initializer( -0.1, 0.1, seed = 2 ) )
+        enc_cell = tf_contrib.rnn.LSTMCell( rnn_size, initializer = tf.random_uniform_initializer( -0.1, 0.1, seed = 2 ) )
 
         return enc_cell
 
@@ -70,12 +70,12 @@ def decoding_layer( target_letter_to_int, decoding_embedding_size, num_lyaers, r
                     max_target_sequence_length, enc_state, dec_input ):
     # 1.Decoder Embedding
     target_vocab_size = len( target_letter_to_int )
-    dec_embeddings = tf.Variable( tf.ramdom_uniform( [target_vocab_size, decoding_embedding_size] ) )
+    dec_embeddings = tf.Variable( tf.random_uniform( [target_vocab_size, decoding_embedding_size] ) )
     dec_embed_input = tf.nn.embedding_lookup( dec_embeddings, dec_input )
 
     # 2. Construct the decoder cell
     def make_cell( rnn_size ):
-        dec_cell = tf_contrib.rnn.LSTMCell( rnn_size, initializer = tf.random_uniform_initializer( -0.1, 0.1, seed - 2 ) )
+        dec_cell = tf_contrib.rnn.LSTMCell( rnn_size, initializer = tf.random_uniform_initializer( -0.1, 0.1, seed = 2 ) )
 
         return dec_cell
 
@@ -91,8 +91,8 @@ def decoding_layer( target_letter_to_int, decoding_embedding_size, num_lyaers, r
 
         # Helper for the training process. Used by BaisicDecoder to read inputs.
         training_helper = tf_contrib.seq2seq.TrainingHelper( inputs = dec_embed_input,
-                                                          seqence_length = target_seqence_lenght,
-                                                          time_majr = False )
+                                                          sequence_length = target_sequence_length,
+                                                          time_major = False )
 
         # Basic decoder
         training_decoder = tf_contrib.seq2seq.BasicDecoder( dec_cell,
@@ -103,7 +103,7 @@ def decoding_layer( target_letter_to_int, decoding_embedding_size, num_lyaers, r
         # Perform dynamic decoding using the decoder
         training_decoder_output = tf_contrib.seq2seq.dynamic_decode( training_decoder,
                                                                   impute_finished = True,
-                                                                  maximun_iterations = max_target_sequence_length )[0]
+                                                                  maximum_iterations = max_target_sequence_length )[0]
 
     # 5. Inference Decoder
     # Resuse the same parameter trained by the training process
@@ -116,23 +116,23 @@ def decoding_layer( target_letter_to_int, decoding_embedding_size, num_lyaers, r
                                                                      target_letter_to_int['<EOS>'] )
 
         # Basic decoder
-        inference_helper = tf_contrib.seq2seq.BasicDecoder( dec_cell,
-                                                            inference_helper,
-                                                            enc_state,
-                                                            output_layer )
+        inference_decoder = tf_contrib.seq2seq.BasicDecoder( dec_cell,
+                                                             inference_helper,
+                                                             enc_state,
+                                                             output_layer )
 
         # Perform dynamic decoding using the decoder
-        inference_decoder_output = tf_contrib.seq2seq.dynamic_decode( inference_decoder_output,
+        inference_decoder_output = tf_contrib.seq2seq.dynamic_decode( inference_decoder,
                                                                       impute_finished  = True,
-                                                                      maximun_iterations = max_target_sequence_length )
+                                                                      maximum_iterations = max_target_sequence_length )[0]
 
     return training_decoder_output, inference_decoder_output
 
 
 '''--------Model--------'''
 def seq2seq_model( input_data, targets, Lr, target_sequence_length, max_target_sequence_length,
-                   source_sequence_length, source_vocab_size, target_vocab_size, dec_embedding_size,
-                   enc_embedding_size, rnn_size, num_layers):
+                   source_sequence_length, source_vocab_size, target_vocab_size, enc_embedding_size,
+                   dec_embedding_size, rnn_size, num_layers ):
 
     # Pass the input data through the encoder. We'll ignore the encoder output, but use the state
     _, enc_state = encoding_layer( input_data,
@@ -142,13 +142,14 @@ def seq2seq_model( input_data, targets, Lr, target_sequence_length, max_target_s
                                    source_vocab_size,
                                    encoding_embedding_size )
 
+
     # Prepare the target sequences we'll feed to the decoder in training made
     dec_input = process_decoder_input( targets, preprocessor.target_letter_to_int, batch_size )
 
     # Pass encoder state and decoder inputs to teh decoders
-    training_decoder_output, inference_decoder_output = decoding_layer( target_letter_to_int,
-                                                                        decoding_ebedding_size,
-                                                                        num_lyaers,
+    training_decoder_output, inference_decoder_output = decoding_layer( preprocessor.target_letter_to_int,
+                                                                        decoding_embedding_size,
+                                                                        num_layers,
                                                                         rnn_size,
                                                                         target_sequence_length,
                                                                         max_target_sequence_length,
@@ -215,7 +216,7 @@ def get_batches( targets, sources, batch_size, source_pad_int, target_pad_int ):
     for batch_i in range( 0, len( sources ) // batch_size ):
         start_i = batch_i * batch_size
         sources_batch = sources[start_i : start_i + batch_size]
-        targets_batch = targets[start_i : start_i * batch_size]
+        targets_batch = targets[start_i : start_i + batch_size]
         pad_sources_batch = np.array( pad_sentence_batch( sources_batch, source_pad_int ) )
         pad_targets_batch = np.array( pad_sentence_batch( targets_batch, target_pad_int ) )
 
@@ -236,20 +237,20 @@ train_source = preprocessor.source_letter_ids[batch_size :]
 train_target = preprocessor.target_letter_ids[batch_size :]
 valid_source = preprocessor.source_letter_ids[: batch_size]
 valid_target = preprocessor.target_letter_ids[: batch_size]
-( valid_targets_batch, valid_sources_batch, valid_targets_lengths, valid_sources_lengths ) = next( get_batches( valid_targt,
-                                                                                                               valid_source,
-                                                                                                               batch_size,
-                                                                                                               preprocessor.source_letter_to_int['<PAD>'],
-                                                                                                               preprocessor.target_letter_to_int['<PAD>']
+( valid_targets_batch, valid_sources_batch, valid_targets_lengths, valid_sources_lengths ) = next( get_batches( valid_target,
+                                                                                                                valid_source,
+                                                                                                                batch_size,
+                                                                                                                preprocessor.source_letter_to_int['<PAD>'],
+                                                                                                                preprocessor.target_letter_to_int['<PAD>']
                                                                                                                 ) )
 
 display_step = 20    # Check training loss after every 20 batches
 
-checkpoint = "best_model.ckpt"
+checkpoint = "./best_model.ckpt"
 with tf.Session( graph = train_graph ) as sess:
     sess.run( tf.global_variables_initializer() )
 
-    for epoch_i in range( 1, epoch + 1 ):
+    for epoch_i in range( 1, epochs + 1 ):
         for batch_i, ( targets_batch, sources_batch, targets_lengths, sources_lengths ) in enumerate(
                 get_batches( train_target, train_source, batch_size,
                              preprocessor.source_letter_to_int['<PAD>'],
@@ -279,11 +280,11 @@ with tf.Session( graph = train_graph ) as sess:
                     }
                 )
 
-                print( 'Epoch { : > 3 } / {} Batch { : > 4 } / {} - Loss : { : 6.3f } - Validation loss : { : > 6.3f }'
+                print( 'Epoch {:>3} / {} Batch {:>4} / {} - Loss : {:6.3f} - Validation loss : {:>6.3f}'
                        .format( epoch_i,
                                 epochs,
                                 batch_i,
-                                len( train_source // batch_size),
+                                len( train_source ) // batch_size,
                                 loss,
                                 validation_loss[0]))
 
@@ -292,47 +293,3 @@ with tf.Session( graph = train_graph ) as sess:
     saver = tf.train.Saver()
     saver.save( sess, checkpoint )
     print( 'Model Trained and Saved' )
-
-
-'''--------Prediction--------'''
-def source_to_seq( text ):
-    '''Prepare the text for the model'''
-    sequence_length = 7
-    return [preprocessor.source_letter_to_int.get( word, preprocessor.source_letter_to_int['<UNK>']) for word in text] + \
-            [preprocessor.source_letter_to_int['<PAD>']] * ( sequence_length - len( text ) )
-
-
-input_sentence = 'hello'
-text = source_to_seq( input_sentence )
-
-checkpoint = './best_model.ckpt'
-
-loaded_graph = tf.Graph()
-with tf.Session( graph = loaded_graph ) as sess:
-    # Load saved model
-    loader = tf.train.import_meta_graph( checkpoint + '.meta' )
-    loader.restore( sess, checkpoint )
-
-    input_data = loaded_graph.get_tensor_by_name( 'input:0' )
-    logits = loaded_graph.get_tensor_by_name( 'predictions:0' )
-    source_sequence_length = loaded_graph.get_tensor_by_name( 'source_sequence_length:0' )
-    target_sequence_length = laoded_graph.get_tensor_by_name( 'target_sequence_length:0' )
-
-    # Multiply by batch_size to match the model's input parameters
-    answer_logits = sess.run( logits, {
-        input_data : [text] * batch_size,
-        target_sequence_length : [len( text )] * batch_size,
-        source_sequence_length : [len( text )] * batch_size
-    })[0]
-
-pad = source_letter_to_int['<PAD>']
-
-print( 'Original Text:', input_sentene )
-
-print( '\nSource' )
-print( '  Word Ids:     {}'.format( [i for i in text] ) )
-print( '  Input Words:  {}'.format( " ".join( [source_int_to_letter[i] for i in text] ) ) )
-
-print( '\nTarghet' )
-print( '  Word Ids:       {}'.format( [i for i in answer_logits if i != pad] ) )
-print( '  Response Words: {}'.format( " ".join( [target_int_to_letter[i] for i in answer_logits if i != pad] ) ) )
